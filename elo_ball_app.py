@@ -1,6 +1,6 @@
 # A very simple Flask Hello World app for you to get started with...
 
-from flask import Flask
+from flask import Flask, jsonify
 
 app = Flask(__name__)
 
@@ -9,8 +9,9 @@ def hello_world():
     return 'Hello from Flask!'
 
 
-@app.route('/games')
+@app.route('/games', methods=['GET'])
 def games():
-    return 'all the games'
+    out = [{'game1':'win'},{'game2':'lose'}]
+    return jsonify(out)
 
 
