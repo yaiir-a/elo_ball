@@ -68,10 +68,16 @@ def games():
             return make_response(jsonify({'error':'duplicate players submitted'}), 400)
         except:
             return make_response(jsonify({'error':'server fuckup'}), 500)
+    elif request.method == 'DELETE':
+        return
     else:
         out = get_all_games()
         return jsonify(out)
 
-
+@app.route('/games/<game_id>', methods=['DELETE'])
+def delete_games(game_id):
+    Games.get( Games.id == game_id ).delete_instance()
+    out = get_all_games()
+    return jsonify(out)
 
 
