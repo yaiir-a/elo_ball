@@ -5,6 +5,7 @@ from passwords import MYSQL_PASSWORD
 from peewee import MySQLDatabase, Model, CharField
 from json import loads, dumps
 from datetime import datetime
+from itertools import chain
 
 
 app = Flask(__name__)
@@ -74,10 +75,28 @@ def games():
         out = get_all_games()
         return jsonify(out)
 
+
 @app.route('/games/<game_id>', methods=['DELETE'])
 def delete_games(game_id):
     Games.get( Games.id == game_id ).delete_instance()
     out = get_all_games()
     return jsonify(out)
+
+
+@app.route('/players', methods=['GET'])
+def get_players():
+    all_games = get_all_games()
+    all_games = [game for game in all_games if 'timestamp' in game] ## TODO: make sure timestamp is present when creating/tidyup db
+    player_set = set(chain(*[game['winners'] + game['losers'] for game in all_games]))
+    player_records = {player:{'record':{'wins':0, 'losses':0}} for player in player_set}
+
+    for game in all_games:
+        winners, losers = game['winners'], game['losers']
+        for player in winners:
+            player_records[player]['record']['wins'] += 1
+        for player in losers:
+            player_records[player]['record']['losses'] += 1
+
+    return jsonify(player_records)
 
 
