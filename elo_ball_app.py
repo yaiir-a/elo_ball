@@ -1,19 +1,30 @@
 # A very simple Flask Hello World app for you to get started with...
 
 from flask import Flask, jsonify, request, make_response
+from passwords import MYSQL_PASSWORD
+from peewee import MySQLDatabase, Model, CharField
+from json import loads, dumps
+from datetime import datetime
+
 
 app = Flask(__name__)
 
 
+db = MySQLDatabase(host='yaiir.mysql.pythonanywhere-services.com',
+                     user="yaiir",
+                     passwd=MYSQL_PASSWORD,
+                     database="yaiir$gamerecords")
+
+class BaseModel(Model):
+    class Meta:
+        database = db
+
+class Games(BaseModel):
+    result = CharField()
+
 
 class GameError(Exception):
     pass
-
-all_games = [
-    {'winners': ['1','2'], 'losers':['3','4']},
-    {'winners': ['1', '2'], 'losers':['3','5']},
-    {'winners': ['1'], 'losers':['3']}
-    ]
 
 
 def validated_players(body):
@@ -23,6 +34,19 @@ def validated_players(body):
     else:
         raise GameError
 
+def get_all_games():
+    all_games = Games.select()
+    out = []
+    for row in all_games:
+        result = loads(row.result)
+        result['id'] = row.id
+        out += [result]
+    return out
+
+def prep_create_game(body):
+    body['timestamp'] = datetime.now().isoformat()
+    prepped_game = {'result':dumps(body)}
+    return prepped_game
 
 
 @app.route('/')
@@ -32,16 +56,22 @@ def hello_world():
 
 @app.route('/games', methods=['GET', 'POST'])
 def games():
-    global all_games
     if request.method == 'POST':
         body = request.get_json()
         try:
             validated_players(body)
-            all_games += [body]
-            return jsonify(all_games)
+            prepped_game = prep_create_game(body)
+            Games.create(**prepped_game)
+            out = get_all_games()
+            return jsonify(out)
         except GameError:
             return make_response(jsonify({'error':'duplicate players submitted'}), 400)
+        except:
+            return make_response(jsonify({'error':'server fuckup'}), 500)
     else:
-        return jsonify(all_games)
+        out = get_all_games()
+        return jsonify(out)
+
+
 
 
