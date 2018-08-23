@@ -36,12 +36,14 @@ def validated_players(body):
         raise GameError
 
 def get_all_games():
+    db.connect(reuse_if_open=True)
     all_games = Games.select()
     out = []
     for row in all_games:
         result = loads(row.result)
         result['id'] = row.id
         out += [result]
+    db.close()
     return out
 
 def prep_create_game(body):
@@ -62,15 +64,15 @@ def games():
         try:
             validated_players(body)
             prepped_game = prep_create_game(body)
+            db.connect(reuse_if_open=True)
             Games.create(**prepped_game)
             out = get_all_games()
+            db.close()
             return jsonify(out)
         except GameError:
             return make_response(jsonify({'error':'duplicate players submitted'}), 400)
         except:
             return make_response(jsonify({'error':'server fuckup'}), 500)
-    elif request.method == 'DELETE':
-        return
     else:
         out = get_all_games()
         return jsonify(out)
