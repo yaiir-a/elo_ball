@@ -7,7 +7,6 @@ from json import loads, dumps
 from datetime import datetime
 from itertools import chain
 
-
 app = Flask(__name__)
 
 
@@ -52,7 +51,8 @@ def prep_create_game(body):
 
 @app.route('/')
 def hello_world():
-    return 'Hello from Flask!'
+    a = test_script()
+    return str(a)
 
 
 @app.route('/games', methods=['GET', 'POST'])
@@ -100,3 +100,22 @@ def get_players():
     return jsonify(player_records)
 
 
+##### SLACK INTEGRATION - should be separate but keeping together for python anywhere limitations
+from re import findall
+
+def extract_all_users_from_text(text):
+    list_of_users = findall('\<(.*?)\>', text)
+    list_with_tags = ['<{}>'.format(user) for user in list_of_users]
+    return list_with_tags
+
+@app.route("/slack", methods=['POST'])
+def slack():
+    text = request.form['text']
+    winners, losers = text.split('beat')
+    out = {
+        'winners': extract_all_users_from_text(winners),
+        'losers': extract_all_users_from_text(losers),
+        'from': 'PA'
+    }
+    #TODO assert that found at least 1 winner and 1 loser
+    return jsonify(out)
