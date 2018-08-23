@@ -6,6 +6,7 @@ from peewee import MySQLDatabase, Model, CharField
 from json import loads, dumps
 from datetime import datetime
 from itertools import chain
+import requests as r
 
 app = Flask(__name__)
 
@@ -51,8 +52,7 @@ def prep_create_game(body):
 
 @app.route('/')
 def hello_world():
-    a = test_script()
-    return str(a)
+    return 'Howdy from Flask'
 
 
 @app.route('/games', methods=['GET', 'POST'])
@@ -111,6 +111,9 @@ def extract_all_users_from_text(text):
 @app.route("/slack", methods=['POST'])
 def slack():
     text = request.form['text']
+    if 'result' in text:
+        out = r.get('https://yaiir.pythonanywhere.com/players').json()
+        return jsonify(out)
     winners, losers = text.split('beat')
     out = {
         'winners': extract_all_users_from_text(winners),
