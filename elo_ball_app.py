@@ -110,14 +110,21 @@ def extract_all_users_from_text(text):
 
 def slack_handle_results():
     players = r.get('https://yaiir.pythonanywhere.com/players').json()
-
     out = '{} | {} | {}\n'.format('Wins', 'Losses', 'Player')
     for name, info in players.items():
         wins, losses = info['record']['wins'], info['record']['losses']
         out += '{}        | {}          | {}\n'.format(wins, losses, name)
-
     return out
 
+def slack_handle_create(text):
+    winners, losers = text.split('beat')
+    out = {
+        'winners': extract_all_users_from_text(winners),
+        'losers': extract_all_users_from_text(losers)
+    }
+    #TODO catch/handle errors
+    out = r.post('https://yaiir.pythonanywhere.com/games', json=out).json()
+    return out
 
 
 @app.route("/slack", methods=['POST'])
@@ -126,12 +133,6 @@ def slack():
     if 'result' in text:
         out = slack_handle_results()
         return out
-
-    winners, losers = text.split('beat')
-    out = {
-        'winners': extract_all_users_from_text(winners),
-        'losers': extract_all_users_from_text(losers),
-        'from': 'PA'
-    }
-    #TODO assert that found at least 1 winner and 1 loser
-    return jsonify(out)
+    if 'beat' in text:
+        out = slack_handle_create(text)
+        return jsonify(out)
