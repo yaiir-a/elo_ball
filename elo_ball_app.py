@@ -139,6 +139,10 @@ def slack_prep_records_for_printing(records_flat):
     for name, wins, losses in records_flat:
         name = name[name.find('|') + 1 : name.find('>')]
         out += '{}       | {}          | {}\n'.format(wins, losses, name)
+    out = {
+        "response_type": "in_channel",
+        "text": out
+    }
     return out
 
 
@@ -148,4 +152,4 @@ def slack():
     if 'beat' in text:
         out = slack_handle_create(text)
     out = slack_handle_results()
-    return out
+    return jsonify(out)
