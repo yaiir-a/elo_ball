@@ -30,7 +30,9 @@ class GameError(Exception):
 
 def validated_players(body):
     all_players = body['winners'] + body['losers']
-    if len(set(all_players)) == len(all_players):
+    no_duplicates = (len(set(all_players)) == len(all_players))
+    all_teams = all([body['winners'], body['losers']])
+    if (no_duplicates and all_teams):
         pass
     else:
         raise GameError
@@ -66,7 +68,7 @@ def games():
             out = get_all_games()
             return jsonify(out)
         except GameError:
-            return make_response(jsonify({'error':'duplicate players submitted'}), 400)
+            return make_response(jsonify({'error':'check the teams reported'}), 400)
         except:
             return make_response(jsonify({'error':'server fuckup'}), 500)
     else:
@@ -135,7 +137,7 @@ def slack_sort_flattened_records(records_flat):
 def slack_prep_records_for_printing(records_flat):
     out = '{} | {} | {}\n'.format('Wins', 'Losses', 'Player')
     for name, wins, losses in records_flat:
-        name = name[name.find('|') + 1 : name.find('>')]
+        name = slack_replace_mentions_with_username(name)
         out += '{}       | {}          | {}\n'.format(wins, losses, name)
     out = {
         "response_type": "in_channel",
