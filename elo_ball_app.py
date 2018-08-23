@@ -155,22 +155,16 @@ def slack_prep_games_for_printing():
         }
     return out
 
-def slack_replace_mentions_with_username(mystring):
-    try:
-        username = findall('\|(.*?)\>', mystring)[0]
-        return sub('\<(.*?)\>', username, mystring)
-    except IndexError:
-        return mystring
+def slack_replace_mentions_with_username(text):
+    return sub('\<(.*?)\|', '', text).replace('>', '')
 
 
 @app.route("/slack", methods=['POST'])
 def slack():
     text = request.form['text']
     if 'beat' in text:
-        # do not escape usernames for the players involved
         out = slack_handle_create(text)
     if 'game' in text:
-        # escap
         out = slack_prep_games_for_printing()
         return jsonify(out)
     out = slack_handle_results()
