@@ -137,6 +137,7 @@ def slack_sort_flattened_records(records_flat):
 def slack_prep_records_for_printing(records_flat):
     out = '{} | {} | {}\n'.format('Wins', 'Losses', 'Player')
     for name, wins, losses in records_flat:
+        name = name[name.find('|') + 1 : name.find('>')]
         out += '{}       | {}          | {}\n'.format(wins, losses, name)
     return out
 
