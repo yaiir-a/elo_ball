@@ -36,14 +36,12 @@ def validated_players(body):
         raise GameError
 
 def get_all_games():
-    db.connect()
     all_games = Games.select()
     out = []
     for row in all_games:
         result = loads(row.result)
         result['id'] = row.id
         out += [result]
-    db.close()
     return out
 
 def prep_create_game(body):
@@ -64,10 +62,8 @@ def games():
         try:
             validated_players(body)
             prepped_game = prep_create_game(body)
-            db.connect()
             Games.create(**prepped_game)
             out = get_all_games()
-            db.close()
             return jsonify(out)
         except GameError:
             return make_response(jsonify({'error':'duplicate players submitted'}), 400)
@@ -147,11 +143,32 @@ def slack_prep_records_for_printing(records_flat):
     }
     return out
 
+def slack_prep_games_for_printing():
+    games = r.get('https://yaiir.pythonanywhere.com/games').json()
+    text = ''
+    for game in games:
+        text += '{} beat {}. ID:{}\n'.format(game['winners'], game['losers'], game['id'])
+    out = {
+        "response_type": "in_channel",
+        "text": text
+        }
+    return out
+
+def slack_replace_mentions_with_username(string):
+    #TODO
+    '''
+    <@UID|username> and <@UID2|username2> and hello --> username and username2 and hello
+    '''
+    return ''
+
 
 @app.route("/slack", methods=['POST'])
 def slack():
     text = request.form['text']
     if 'beat' in text:
         out = slack_handle_create(text)
+    if 'game' in text:
+        out = slack_prep_games_for_printing()
+        return jsonify(out)
     out = slack_handle_results()
     return jsonify(out)
