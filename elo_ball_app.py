@@ -36,7 +36,7 @@ def validated_players(body):
         raise GameError
 
 def get_all_games():
-    db.connect(reuse_if_open=True)
+    db.connect()
     all_games = Games.select()
     out = []
     for row in all_games:
@@ -64,7 +64,7 @@ def games():
         try:
             validated_players(body)
             prepped_game = prep_create_game(body)
-            db.connect(reuse_if_open=True)
+            db.connect()
             Games.create(**prepped_game)
             out = get_all_games()
             db.close()
