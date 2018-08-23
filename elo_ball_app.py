@@ -108,12 +108,25 @@ def extract_all_users_from_text(text):
     list_with_tags = ['<{}>'.format(user) for user in list_of_users]
     return list_with_tags
 
+def slack_handle_results():
+    players = r.get('https://yaiir.pythonanywhere.com/players').json()
+
+    out = '{} | {} | {}\n'.format('Wins', 'Losses', 'Player')
+    for name, info in players.items():
+        wins, losses = info['record']['wins'], info['record']['losses']
+        out += '{}        | {}          | {}\n'.format(wins, losses, name)
+
+    return out
+
+
+
 @app.route("/slack", methods=['POST'])
 def slack():
     text = request.form['text']
     if 'result' in text:
-        out = r.get('https://yaiir.pythonanywhere.com/players').json()
-        return jsonify(out)
+        out = slack_handle_results()
+        return out
+
     winners, losers = text.split('beat')
     out = {
         'winners': extract_all_users_from_text(winners),
