@@ -108,14 +108,6 @@ def extract_all_users_from_text(text):
     list_with_tags = ['<{}>'.format(user) for user in list_of_users]
     return list_with_tags
 
-def slack_handle_results():
-    players = r.get('https://yaiir.pythonanywhere.com/players').json()
-    out = '{} | {} | {}\n'.format('Wins', 'Losses', 'Player')
-    for name, info in players.items():
-        wins, losses = info['record']['wins'], info['record']['losses']
-        out += '{}        | {}          | {}\n'.format(wins, losses, name)
-    return out
-
 def slack_handle_create(text):
     winners, losers = text.split('beat')
     out = {
@@ -124,15 +116,35 @@ def slack_handle_create(text):
     }
     #TODO catch/handle errors
     out = r.post('https://yaiir.pythonanywhere.com/games', json=out).json()
+
+def slack_handle_results():
+    players = r.get('https://yaiir.pythonanywhere.com/players').json()
+    flattened = slack_flatten_records(players)
+    sorted_recs = slack_sort_flattened_records(flattened)
+    prepped_for_printing = slack_prep_records_for_printing(sorted_recs)
+    return prepped_for_printing
+
+def slack_flatten_records(players):
+    out = []
+    for name, info in players.items():
+        out += [(name, info['record']['wins'], info['record']['losses'])]
+    return out
+
+def slack_sort_flattened_records(records_flat):
+    records_flat.sort(key=lambda x: (x[1], x[2]), reverse=True)
+    return records_flat
+
+def slack_prep_records_for_printing(records_flat):
+    out = '{} | {} | {}\n'.format('Wins', 'Losses', 'Player')
+    for name, wins, losses in records_flat:
+        out += '{}       | {}          | {}\n'.format(wins, losses, name)
     return out
 
 
 @app.route("/slack", methods=['POST'])
 def slack():
     text = request.form['text']
-    if 'result' in text:
-        out = slack_handle_results()
-        return out
     if 'beat' in text:
         out = slack_handle_create(text)
-        return jsonify(out)
+    out = slack_handle_results()
+    return out
