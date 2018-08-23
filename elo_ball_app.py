@@ -99,7 +99,7 @@ def get_players():
 
 
 ##### SLACK INTEGRATION - should be separate but keeping together for python anywhere limitations
-from re import findall
+from re import findall, sub
 
 def extract_all_users_from_text(text):
     list_of_users = findall('\<(.*?)\>', text)
@@ -148,26 +148,29 @@ def slack_prep_games_for_printing():
     text = ''
     for game in games:
         text += '{} beat {}. ID:{}\n'.format(game['winners'], game['losers'], game['id'])
+    text = slack_replace_mentions_with_username(text)
     out = {
         "response_type": "in_channel",
         "text": text
         }
     return out
 
-def slack_replace_mentions_with_username(string):
-    #TODO
-    '''
-    <@UID|username> and <@UID2|username2> and hello --> username and username2 and hello
-    '''
-    return ''
+def slack_replace_mentions_with_username(mystring):
+    try:
+        username = findall('\|(.*?)\>', mystring)[0]
+        return sub('\<(.*?)\>', username, mystring)
+    except IndexError:
+        return mystring
 
 
 @app.route("/slack", methods=['POST'])
 def slack():
     text = request.form['text']
     if 'beat' in text:
+        # do not escape usernames for the players involved
         out = slack_handle_create(text)
     if 'game' in text:
+        # escap
         out = slack_prep_games_for_printing()
         return jsonify(out)
     out = slack_handle_results()
