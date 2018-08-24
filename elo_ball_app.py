@@ -160,14 +160,22 @@ def slack_prep_records_for_printing(records_flat):
 
 def slack_prep_games_for_printing():
     games = r.get('https://yaiir.pythonanywhere.com/games').json()
-    text = ''
-    for game in games:
-        text += '{} beat {}. ID:{}\n'.format(game['winners'], game['losers'], game['id'])
-    text = slack_replace_mentions_with_username(text)
-    out = {
-        "response_type": "in_channel",
-        "text": text
-        }
+    attachments = []
+    for game in games[::-1]:
+        attachments += [{
+                "title": '{} beat {} at {}'.format(game['winners'], game['losers'], game['timestamp']),
+                "callback_id": "delete_game",
+                "attachment_type": "default",
+                "actions": [
+                    {
+                        "name": "delete",
+                        "text": "Delete Game",
+                        "type": "button",
+                        "value": game['id']
+                    }
+                ]
+            }]
+    out =   {"text": "all the games", "attachments": attachments}
     return out
 
 def slack_replace_mentions_with_username(text):
@@ -186,3 +194,10 @@ def slack():
         return jsonify(out)
     out = slack_handle_results()
     return jsonify(out)
+
+@app.route("/slack/actions", methods=['GET', 'POST'])
+def slack_action():
+    payload = loads(request.form['payload'])
+    game_id = payload['actions'][0]['value']
+    r.delete('http://yaiir.pythonanywhere.com/games/' + game_id)
+    return 'deleted game: {}'.format(game_id)
