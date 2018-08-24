@@ -31,6 +31,7 @@ class BaseModel(Model):
 
 class Games(BaseModel):
     result = CharField()
+    account_id = CharField()
 
 
 class GameError(Exception):
@@ -57,7 +58,7 @@ def get_all_games():
 
 def prep_create_game(body):
     body['timestamp'] = datetime.now().isoformat()
-    prepped_game = {'result':dumps(body)}
+    prepped_game = {'result':dumps(body), 'account_id':'default'}
     return prepped_game
 
 
