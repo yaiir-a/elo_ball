@@ -16,6 +16,15 @@ db = MySQLDatabase(host='yaiir.mysql.pythonanywhere-services.com',
                      passwd=MYSQL_PASSWORD,
                      database="yaiir$gamerecords")
 
+@app.before_request
+def _db_connect():
+    db.connect()
+
+@app.teardown_request
+def _db_close(exc):
+    if not db.is_closed():
+        db.close()
+
 class BaseModel(Model):
     class Meta:
         database = db
