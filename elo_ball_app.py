@@ -121,15 +121,24 @@ def extract_all_users_from_text(text):
     list_with_tags = ['<{}>'.format(user) for user in list_of_users]
     return list_with_tags
 
-def slack_handle_create(text):
-    winners, losers = text.split('beat')
+def slack_create_single(winners, losers, timestamp):
     out = {
-        'winners': extract_all_users_from_text(winners),
-        'losers': extract_all_users_from_text(losers)
-    }
-    #TODO catch/handle errors
-    out = r.post('https://yaiir.pythonanywhere.com/games', json=out).json()
-    return out
+            'winners': winners,
+            'losers': losers,
+            'timestamp': timestamp
+        }
+    r.post('https://yaiir.pythonanywhere.com/games', json=out)
+
+def slack_handle_create(report):
+    timestamp = datetime.now().isoformat()
+
+    for _ in range(report['a']['wins']):
+        slack_create_single(report['a']['members'], report['b']['members'], timestamp)
+
+    for _ in range(report['b']['wins']):
+        slack_create_single(report['b']['members'], report['a']['members'], timestamp)
+
+
 
 def slack_handle_results(text=None):
     players = r.get('https://yaiir.pythonanywhere.com/players').json()
@@ -190,19 +199,30 @@ def slack_prep_games_for_printing(text='all the games'):
 def slack_replace_mentions_with_username(text):
     return sub('\<(.*?)\|', '', text).replace('>', '')
 
+def slack_clean_input(text):
+    a, b = text.replace(' ', '').replace('beat', '1-0').split('-')
+    team_a, wins_a = a[:-1], int(a[-1])
+    team_b, wins_b = b[1:], int(b[0])
+    out = {
+        'a':{'members':extract_all_users_from_text(team_a), 'wins':wins_a},
+        'b':{'members':extract_all_users_from_text(team_b), 'wins':wins_b}
+    }
+    return out
 
 @app.route("/slack", methods=['POST'])
 def slack():
     text = request.form['text']
-    if 'beat' in text:
-        slack_handle_create(text)
+    try:
+        report = slack_clean_input(text)
+        slack_handle_create(report)
         out = slack_handle_results(text)
         return jsonify(out)
-    if 'game' in text:
-        out = slack_prep_games_for_printing()
+    except ValueError:
+        if 'game' in text:
+            out = slack_prep_games_for_printing()
+            return jsonify(out)
+        out = slack_handle_results()
         return jsonify(out)
-    out = slack_handle_results()
-    return jsonify(out)
 
 @app.route("/slack/actions", methods=['GET', 'POST'])
 def slack_action():
