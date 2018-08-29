@@ -38,7 +38,7 @@ class GameError(Exception):
     pass
 
 
-def validated_players(body):
+def validated_game(body):
     all_players = body['winners'] + body['losers']
     no_duplicates = (len(set(all_players)) == len(all_players))
     all_teams = all([body['winners'], body['losers']])
@@ -57,7 +57,10 @@ def get_all_games():
     return out
 
 def prep_create_game(body):
-    body['timestamp'] = datetime.now().isoformat()
+    try:
+        body['timestamp']
+    except KeyError:
+        body['timestamp'] = datetime.now().isoformat()
     prepped_game = {'result':dumps(body), 'account_id':'default'}
     return prepped_game
 
@@ -72,7 +75,7 @@ def games():
     if request.method == 'POST':
         body = request.get_json()
         try:
-            validated_players(body)
+            validated_game(body)
             prepped_game = prep_create_game(body)
             Games.create(**prepped_game)
             out = get_all_games()
