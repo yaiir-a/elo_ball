@@ -145,7 +145,8 @@ def slack_flatten_records(players):
     return out
 
 def slack_sort_flattened_records(records_flat):
-    records_flat.sort(key=lambda x: (x[1], x[2]), reverse=True)
+    records_flat.sort(key=lambda x: x[2])
+    records_flat.sort(key=lambda x: x[1], reverse=True)
     return records_flat
 
 def slack_prep_records_for_printing(records_flat):
