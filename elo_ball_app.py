@@ -70,7 +70,6 @@ class PlayerList(object):
     def add_records(self):
         for player in self.players:
             self.players[player]['record'] = {'wins':0, 'losses':0}
-
         for winners, losers, timestamp in self.games_list:
             for player in winners:
                 self.players[player]['record']['wins'] += 1
@@ -81,7 +80,6 @@ class PlayerList(object):
     def add_rating(self):
         for player in self.players:
             self.players[player]['elo'] = {'current':1500, 'history':[]}
-
         for winners, losers, timestamp in self.games_list:
             for player in winners:
                 self.players[player]['elo']['current'] += 100
@@ -91,23 +89,32 @@ class PlayerList(object):
                 self.players[player]['elo']['history'] += [{timestamp: self.players[player]['elo']['current']}]
         return self
 
+class SingleGame(object):
+    def __init__(self, game):
+        self.validated_game(game)
+        self.game = game
 
-def validated_game(body):
-    all_players = body['winners'] + body['losers']
-    no_duplicates = (len(set(all_players)) == len(all_players))
-    all_teams = all([body['winners'], body['losers']])
-    if (no_duplicates and all_teams):
-        pass
-    else:
-        raise GameError
+    def validated_game(self, body):
+        all_players = body['winners'] + body['losers']
+        no_duplicates = (len(set(all_players)) == len(all_players))
+        all_teams = all([body['winners'], body['losers']])
+        if (no_duplicates and all_teams):
+            pass
+        else:
+            raise GameError
 
-def prep_create_game(body):
-    try:
-        body['timestamp']
-    except KeyError:
-        body['timestamp'] = datetime.now().isoformat()
-    prepped_game = {'result':dumps(body), 'account_id':'default'}
-    return prepped_game
+    def prep_create_game(self):
+        try:
+            self.game['timestamp']
+        except KeyError:
+            self.game['timestamp'] = datetime.now().isoformat()
+        prepped_game = {'result':dumps(self.game), 'account_id':'default'}
+        return prepped_game
+
+    def create(self):
+        prepped_game = self.prep_create_game()
+        Games.create(**prepped_game)
+        return self
 
 
 @app.route('/')
@@ -120,9 +127,7 @@ def games():
     if request.method == 'POST':
         body = request.get_json()
         try:
-            validated_game(body)
-            prepped_game = prep_create_game(body)
-            Games.create(**prepped_game)
+            SingleGame(body).create()
             return jsonify(GameList().games)
         except GameError:
             return make_response(jsonify({'error':'check the teams reported'}), 400)
