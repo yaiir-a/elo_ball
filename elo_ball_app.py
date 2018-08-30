@@ -39,9 +39,20 @@ class GameError(Exception):
 
 
 class GameList(object):
-    def __init__(self, games):
-        games.sort(key=lambda x: x['timestamp'])
-        self.games = games
+    def __init__(self):
+        self.games = self.get_all_games()
+
+    def get_all_games(self):
+        all_games = Games.select()
+        out = []
+        for row in all_games:
+            result = loads(row.result)
+            result['id'] = row.id
+            out += [result]
+
+        out.sort(key=lambda x: x['timestamp'])
+        return out
+
 
 class PlayerList(object):
     def __init__(self, games):
@@ -89,15 +100,6 @@ def validated_game(body):
     else:
         raise GameError
 
-def get_all_games():
-    all_games = Games.select()
-    out = []
-    for row in all_games:
-        result = loads(row.result)
-        result['id'] = row.id
-        out += [result]
-    return GameList(out)
-
 def prep_create_game(body):
     try:
         body['timestamp']
@@ -120,24 +122,24 @@ def games():
             validated_game(body)
             prepped_game = prep_create_game(body)
             Games.create(**prepped_game)
-            return jsonify(get_all_games().games)
+            return jsonify(GameList().games)
         except GameError:
             return make_response(jsonify({'error':'check the teams reported'}), 400)
         except:
             return make_response(jsonify({'error':'server fuckup'}), 500)
     else:
-        return jsonify(get_all_games().games)
+        return jsonify(GameList().games)
 
 
 @app.route('/games/<game_id>', methods=['DELETE'])
 def delete_games(game_id):
     Games.get( Games.id == game_id ).delete_instance()
-    return jsonify(get_all_games().games)
+    return jsonify(GameList().games)
 
 
 @app.route('/players', methods=['GET'])
 def get_players():
-    game_list = get_all_games()
+    game_list = GameList()
     player_list = PlayerList(game_list).add_records().add_rating()
 
     return jsonify(player_list.players)
