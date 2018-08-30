@@ -39,17 +39,29 @@ class GameError(Exception):
 
 
 class GameList(object):
-    def __init__(self, games):
-        games.sort(key=lambda x: x['timestamp'])
-        self.games = games
+    def __init__(self):
+        self.games = self.get_all_games()
+
+    def get_all_games(self):
+        all_games = Games.select()
+        out = []
+        for row in all_games:
+            result = loads(row.result)
+            result['id'] = row.id
+            out += [result]
+
+        out.sort(key=lambda x: x['timestamp'])
+        return out
+
 
 class PlayerList(object):
     def __init__(self, games):
         self.games = games
         player_set = chain(*[game['winners'] + game['losers'] for game in games.games])
         self.players = {player:dict() for player in player_set}
+        self.games_list = self._games_list()
 
-    def games_list(self):
+    def _games_list(self):
         games_list = []
         for game in self.games.games:
             games_list += [[game['winners'], game['losers'], game['timestamp']]]
@@ -58,8 +70,7 @@ class PlayerList(object):
     def add_records(self):
         for player in self.players:
             self.players[player]['record'] = {'wins':0, 'losses':0}
-
-        for winners, losers, timestamp in self.games_list():
+        for winners, losers, timestamp in self.games_list:
             for player in winners:
                 self.players[player]['record']['wins'] += 1
             for player in losers:
@@ -69,8 +80,7 @@ class PlayerList(object):
     def add_rating(self):
         for player in self.players:
             self.players[player]['elo'] = {'current':1500, 'history':[]}
-
-        for winners, losers, timestamp in self.games_list():
+        for winners, losers, timestamp in self.games_list:
             for player in winners:
                 self.players[player]['elo']['current'] += 100
                 self.players[player]['elo']['history'] += [{timestamp: self.players[player]['elo']['current']}]
@@ -79,32 +89,32 @@ class PlayerList(object):
                 self.players[player]['elo']['history'] += [{timestamp: self.players[player]['elo']['current']}]
         return self
 
+class SingleGame(object):
+    def __init__(self, game):
+        self.validated_game(game)
+        self.game = game
 
-def validated_game(body):
-    all_players = body['winners'] + body['losers']
-    no_duplicates = (len(set(all_players)) == len(all_players))
-    all_teams = all([body['winners'], body['losers']])
-    if (no_duplicates and all_teams):
-        pass
-    else:
-        raise GameError
+    def validated_game(self, body):
+        all_players = body['winners'] + body['losers']
+        no_duplicates = (len(set(all_players)) == len(all_players))
+        all_teams = all([body['winners'], body['losers']])
+        if (no_duplicates and all_teams):
+            pass
+        else:
+            raise GameError
 
-def get_all_games():
-    all_games = Games.select()
-    out = []
-    for row in all_games:
-        result = loads(row.result)
-        result['id'] = row.id
-        out += [result]
-    return GameList(out)
+    def prep_create_game(self):
+        try:
+            self.game['timestamp']
+        except KeyError:
+            self.game['timestamp'] = datetime.now().isoformat()
+        prepped_game = {'result':dumps(self.game), 'account_id':'default'}
+        return prepped_game
 
-def prep_create_game(body):
-    try:
-        body['timestamp']
-    except KeyError:
-        body['timestamp'] = datetime.now().isoformat()
-    prepped_game = {'result':dumps(body), 'account_id':'default'}
-    return prepped_game
+    def create(self):
+        prepped_game = self.prep_create_game()
+        Games.create(**prepped_game)
+        return self
 
 
 @app.route('/')
@@ -117,27 +127,25 @@ def games():
     if request.method == 'POST':
         body = request.get_json()
         try:
-            validated_game(body)
-            prepped_game = prep_create_game(body)
-            Games.create(**prepped_game)
-            return jsonify(get_all_games().games)
+            SingleGame(body).create()
+            return jsonify(GameList().games)
         except GameError:
             return make_response(jsonify({'error':'check the teams reported'}), 400)
         except:
             return make_response(jsonify({'error':'server fuckup'}), 500)
     else:
-        return jsonify(get_all_games().games)
+        return jsonify(GameList().games)
 
 
 @app.route('/games/<game_id>', methods=['DELETE'])
 def delete_games(game_id):
     Games.get( Games.id == game_id ).delete_instance()
-    return jsonify(get_all_games().games)
+    return jsonify(GameList().games)
 
 
 @app.route('/players', methods=['GET'])
 def get_players():
-    game_list = get_all_games()
+    game_list = GameList()
     player_list = PlayerList(game_list).add_records().add_rating()
 
     return jsonify(player_list.players)
