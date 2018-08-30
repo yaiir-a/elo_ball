@@ -59,8 +59,9 @@ class PlayerList(object):
         self.games = games
         player_set = chain(*[game['winners'] + game['losers'] for game in games.games])
         self.players = {player:dict() for player in player_set}
+        self.games_list = self._games_list()
 
-    def games_list(self):
+    def _games_list(self):
         games_list = []
         for game in self.games.games:
             games_list += [[game['winners'], game['losers'], game['timestamp']]]
@@ -70,7 +71,7 @@ class PlayerList(object):
         for player in self.players:
             self.players[player]['record'] = {'wins':0, 'losses':0}
 
-        for winners, losers, timestamp in self.games_list():
+        for winners, losers, timestamp in self.games_list:
             for player in winners:
                 self.players[player]['record']['wins'] += 1
             for player in losers:
@@ -81,7 +82,7 @@ class PlayerList(object):
         for player in self.players:
             self.players[player]['elo'] = {'current':1500, 'history':[]}
 
-        for winners, losers, timestamp in self.games_list():
+        for winners, losers, timestamp in self.games_list:
             for player in winners:
                 self.players[player]['elo']['current'] += 100
                 self.players[player]['elo']['history'] += [{timestamp: self.players[player]['elo']['current']}]
