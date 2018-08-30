@@ -38,6 +38,48 @@ class GameError(Exception):
     pass
 
 
+class GameList(object):
+    def __init__(self, games):
+        games.sort(key=lambda x: x['timestamp'])
+        self.games = games
+
+class PlayerList(object):
+    def __init__(self, games):
+        self.games = games
+        player_set = chain(*[game['winners'] + game['losers'] for game in games.games])
+        self.players = {player:dict() for player in player_set}
+
+    def games_list(self):
+        games_list = []
+        for game in self.games.games:
+            games_list += [[game['winners'], game['losers'], game['timestamp']]]
+        return games_list
+
+    def add_records(self):
+        for player in self.players:
+            self.players[player]['record'] = {'wins':0, 'losses':0}
+
+        for winners, losers, timestamp in self.games_list():
+            for player in winners:
+                self.players[player]['record']['wins'] += 1
+            for player in losers:
+                self.players[player]['record']['losses'] += 1
+        return self
+
+    def add_rating(self):
+        for player in self.players:
+            self.players[player]['elo'] = {'current':1500, 'history':[]}
+
+        for winners, losers, timestamp in self.games_list():
+            for player in winners:
+                self.players[player]['elo']['current'] += 100
+                self.players[player]['elo']['history'] += [{timestamp: self.players[player]['elo']['current']}]
+            for player in losers:
+                self.players[player]['elo']['current'] -= 100
+                self.players[player]['elo']['history'] += [{timestamp: self.players[player]['elo']['current']}]
+        return self
+
+
 def validated_game(body):
     all_players = body['winners'] + body['losers']
     no_duplicates = (len(set(all_players)) == len(all_players))
@@ -54,7 +96,7 @@ def get_all_games():
         result = loads(row.result)
         result['id'] = row.id
         out += [result]
-    return out
+    return GameList(out)
 
 def prep_create_game(body):
     try:
@@ -78,39 +120,27 @@ def games():
             validated_game(body)
             prepped_game = prep_create_game(body)
             Games.create(**prepped_game)
-            out = get_all_games()
-            return jsonify(out)
+            return jsonify(get_all_games().games)
         except GameError:
             return make_response(jsonify({'error':'check the teams reported'}), 400)
         except:
             return make_response(jsonify({'error':'server fuckup'}), 500)
     else:
-        out = get_all_games()
-        return jsonify(out)
+        return jsonify(get_all_games().games)
 
 
 @app.route('/games/<game_id>', methods=['DELETE'])
 def delete_games(game_id):
     Games.get( Games.id == game_id ).delete_instance()
-    out = get_all_games()
-    return jsonify(out)
+    return jsonify(get_all_games().games)
 
 
 @app.route('/players', methods=['GET'])
 def get_players():
-    all_games = get_all_games()
-    all_games = [game for game in all_games if 'timestamp' in game] ## TODO: make sure timestamp is present when creating/tidyup db
-    player_set = set(chain(*[game['winners'] + game['losers'] for game in all_games]))
-    player_records = {player:{'record':{'wins':0, 'losses':0}} for player in player_set}
+    game_list = get_all_games()
+    player_list = PlayerList(game_list).add_records().add_rating()
 
-    for game in all_games:
-        winners, losers = game['winners'], game['losers']
-        for player in winners:
-            player_records[player]['record']['wins'] += 1
-        for player in losers:
-            player_records[player]['record']['losses'] += 1
-
-    return jsonify(player_records)
+    return jsonify(player_list.players)
 
 
 ##### SLACK INTEGRATION - should be separate but keeping together for python anywhere limitations
