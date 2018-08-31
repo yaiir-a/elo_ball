@@ -92,13 +92,13 @@ class PlayerList(object):
             losers_av =  sum([int(self.players[loser]['elo']['current']) for loser in losers])
             winner_gain = self._calc_winner_change(winners_av, losers_av)
 
-        for winner in winners:
-            self.players[winner]['elo']['current'] += winner_gain
-            self.players[winner]['elo']['history'] += [(timestamp, self.players[winner]['elo']['current'] )]
+            for winner in winners:
+                self.players[winner]['elo']['current'] += winner_gain
+                self.players[winner]['elo']['history'] += [(timestamp, self.players[winner]['elo']['current'] )]
 
-        for loser in losers:
-            self.players[loser]['elo']['current'] -= winner_gain
-            self.players[loser]['elo']['history'] += [(timestamp, self.players[loser]['elo']['current'] )]
+            for loser in losers:
+                self.players[loser]['elo']['current'] -= winner_gain
+                self.players[loser]['elo']['history'] += [(timestamp, self.players[loser]['elo']['current'] )]
 
         return self
 
@@ -169,6 +169,7 @@ def get_players():
 ##### SLACK INTEGRATION - should be separate but keeping together for python anywhere limitations
 from re import findall, sub
 
+
 def extract_all_users_from_text(text):
     list_of_users = findall('\<(.*?)\>', text)
     list_with_tags = ['<{}>'.format(user) for user in list_of_users]
@@ -198,7 +199,7 @@ def slack_handle_results(text=None):
     flattened = slack_flatten_records(players)
     if text:
         involved = extract_all_users_from_text(text)
-        flattened = [(name, wins, losses) for (name, wins, losses) in flattened if (name in involved)]
+        flattened = [(name, wins, losses, elo) for (name, wins, losses, elo) in flattened if (name in involved)]
     sorted_recs = slack_sort_flattened_records(flattened)
     prepped_for_printing = slack_prep_records_for_printing(sorted_recs)
     return prepped_for_printing
@@ -206,19 +207,21 @@ def slack_handle_results(text=None):
 def slack_flatten_records(players):
     out = []
     for name, info in players.items():
-        out += [(name, info['record']['wins'], info['record']['losses'])]
+        out += [(name, info['record']['wins'], info['record']['losses'], info['elo']['current'])]
     return out
 
 def slack_sort_flattened_records(records_flat):
     records_flat.sort(key=lambda x: x[2])
     records_flat.sort(key=lambda x: x[1], reverse=True)
+    records_flat.sort(key=lambda x: x[3], reverse=True)
     return records_flat
 
 def slack_prep_records_for_printing(records_flat):
-    out = '{} | {} | {}\n'.format('Wins', 'Losses', 'Player')
-    for name, wins, losses in records_flat:
+    out = '{}     | {} | {} | {} \n'.format('Elo', 'Wins', 'Losses', 'Player')
+
+    for name, wins, losses, elo in records_flat:
         name = slack_replace_mentions_with_username(name)
-        out += '{}       | {}          | {}\n'.format(wins, losses, name)
+        out += '{} | {}        | {}          | {}\n'.format(round(elo), wins, losses, name)
     out = {
         "response_type": "in_channel",
         "text": out
