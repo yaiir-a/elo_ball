@@ -77,17 +77,32 @@ class PlayerList(object):
                 self.players[player]['record']['losses'] += 1
         return self
 
-    def add_rating(self):
+    def _calc_winner_change(self, sum_winners_elo, sum_losers_elo):
+        Rw = 10 ** (sum_winners_elo/400)
+        Rl = 10 ** (sum_losers_elo/400)
+        Ew = Rw / (Rw + Rl)
+        winner_change = 32 * (1 - Ew)
+        return winner_change
+
+    def add_elo(self):
         for player in self.players:
             self.players[player]['elo'] = {'current':1500, 'history':[]}
         for winners, losers, timestamp in self.games_list:
-            for player in winners:
-                self.players[player]['elo']['current'] += 100
-                self.players[player]['elo']['history'] += [{timestamp: self.players[player]['elo']['current']}]
-            for player in losers:
-                self.players[player]['elo']['current'] -= 100
-                self.players[player]['elo']['history'] += [{timestamp: self.players[player]['elo']['current']}]
+            winners_av =  sum([int(self.players[winner]['elo']['current']) for winner in winners])
+            losers_av =  sum([int(self.players[loser]['elo']['current']) for loser in losers])
+            winner_gain = self._calc_winner_change(winners_av, losers_av)
+
+        for winner in winners:
+            self.players[winner]['elo']['current'] += winner_gain
+            self.players[winner]['elo']['history'] += [(timestamp, self.players[winner]['elo']['current'] )]
+
+        for loser in losers:
+            self.players[loser]['elo']['current'] -= winner_gain
+            self.players[loser]['elo']['history'] += [(timestamp, self.players[loser]['elo']['current'] )]
+
         return self
+
+
 
 class SingleGame(object):
     def __init__(self, game):
@@ -139,6 +154,7 @@ def games():
 
 @app.route('/games/<game_id>', methods=['DELETE'])
 def delete_games(game_id):
+    # TODO move this into SingleGame(), can then return metadata of deleted game
     Games.get( Games.id == game_id ).delete_instance()
     return jsonify(GameList().games)
 
@@ -146,8 +162,7 @@ def delete_games(game_id):
 @app.route('/players', methods=['GET'])
 def get_players():
     game_list = GameList()
-    player_list = PlayerList(game_list).add_records().add_rating()
-
+    player_list = PlayerList(game_list).add_records().add_elo()
     return jsonify(player_list.players)
 
 
