@@ -182,14 +182,6 @@ class SlackSingleGame(object):
         return self
 
 
-
-
-def extract_all_users_from_text(text):
-    list_of_users = findall('\<(.*?)\>', text)
-    list_with_tags = ['<{}>'.format(user) for user in list_of_users]
-    return list_with_tags
-
-
 def slack_handle_create(report):
     timestamp = datetime.now().isoformat()
 
@@ -228,48 +220,16 @@ class SlackPlayerList(object):
         out = '{}     | {} | {} | {} \n'.format('Elo', 'Wins', 'Losses', 'Player')
         for name, wins, losses, elo in playerlist:
             out += '{} | {}        | {}          | {}\n'.format(round(elo), wins, losses, name)
-        out = slack_replace_mentions_with_username(out)
+        out = self._replace_mentions_with_username(out)
         out = {
             "response_type": "in_channel",
             "text": out
         }
         return out
 
+    def _replace_mentions_with_username(self, text):
+        return sub('\<(.*?)\|', '', text).replace('>', '')
 
-
-def slack_handle_results(text=None):
-    #players = r.get('https://yaiir.pythonanywhere.com/players').json()
-    #flattened = slack_flatten_records(players)
-    if text:
-        involved = extract_all_users_from_text(text)
-        # flattened = [(name, wins, losses, elo) for (name, wins, losses, elo) in flattened if (name in involved)]
-    #sorted_recs = slack_sort_flattened_records(flattened)
-    prepped_for_printing = slack_prep_records_for_printing(sorted_recs)
-    return prepped_for_printing
-
-def slack_flatten_records(players):
-    out = []
-    for name, info in players.items():
-        out += [(name, info['record']['wins'], info['record']['losses'], info['elo']['current'])]
-    return out
-
-def slack_sort_flattened_records(records_flat):
-    records_flat.sort(key=lambda x: x[2])
-    records_flat.sort(key=lambda x: x[1], reverse=True)
-    records_flat.sort(key=lambda x: x[3], reverse=True)
-    return records_flat
-
-def slack_prep_records_for_printing(records_flat):
-    out = '{}     | {} | {} | {} \n'.format('Elo', 'Wins', 'Losses', 'Player')
-
-    for name, wins, losses, elo in records_flat:
-        name = slack_replace_mentions_with_username(name)
-        out += '{} | {}        | {}          | {}\n'.format(round(elo), wins, losses, name)
-    out = {
-        "response_type": "in_channel",
-        "text": out
-    }
-    return out
 
 def slack_prep_games_for_printing(text='all the games'):
     games = r.get('https://yaiir.pythonanywhere.com/games').json()
@@ -295,18 +255,6 @@ def slack_prep_games_for_printing(text='all the games'):
         }
     return out
 
-def slack_replace_mentions_with_username(text):
-    return sub('\<(.*?)\|', '', text).replace('>', '')
-
-def slack_clean_input(text):
-    a, b = text.replace(' ', '').replace('beat', '1-0').split('-')
-    team_a, wins_a = a[:-1], int(a[-1])
-    team_b, wins_b = b[1:], int(b[0])
-    out = {
-        'a':{'members':extract_all_users_from_text(team_a), 'wins':wins_a},
-        'b':{'members':extract_all_users_from_text(team_b), 'wins':wins_b}
-    }
-    return out
 
 class SlackCommand(object):
     def __init__(self, request):
@@ -314,6 +262,9 @@ class SlackCommand(object):
         self.raw_text = request.form['text']
         self.cleaned_text = request.form['text'].replace(' ', '').replace('beat', '1-0')
         self.com_type = self._calc_type()
+        self.users = self._extract_all_users_from_text(self.cleaned_text)
+        if self.com_type == 'report':
+            self.report = self._clean_input()
 
     def _calc_type(self):
         if '-' in self.cleaned_text:
@@ -323,26 +274,32 @@ class SlackCommand(object):
         else:
             return 'playerlist'
 
-    def slack_clean_input(self):
+    def _clean_input(self):
         a, b = self.cleaned_text.split('-')
         team_a, wins_a = a[:-1], int(a[-1])
         team_b, wins_b = b[1:], int(b[0])
         out = {
-            'a':{'members':extract_all_users_from_text(team_a), 'wins':wins_a},
-            'b':{'members':extract_all_users_from_text(team_b), 'wins':wins_b}
+            'a':{'members':self._extract_all_users_from_text(team_a), 'wins':wins_a},
+            'b':{'members':self._extract_all_users_from_text(team_b), 'wins':wins_b}
         }
         return out
 
+    def _extract_all_users_from_text(self, text):
+        list_of_users = findall('\<(.*?)\>', text)
+        list_with_tags = ['<{}>'.format(user) for user in list_of_users]
+        return list_with_tags
+
+
 @app.route("/slack", methods=['POST'])
 def slack():
-    text = request.form['text']
     command = SlackCommand(request)
     if command.com_type == 'report':
-        report = slack_clean_input(text)
-        slack_handle_create(report)
-        out = slack_handle_results(text)
+        slack_handle_create(command.report)
+        ## TODO command.create()
+        out = SlackPlayerList().pprint(command.users)
         return jsonify(out)
     if command.com_type == 'gamelist':
+        ## TODO out = SlackGamesList()
         out = slack_prep_games_for_printing()
         return jsonify(out)
     if command.com_type == 'playerlist':
