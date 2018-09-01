@@ -202,14 +202,48 @@ def slack_handle_create(report):
         SlackSingleGame(winners, losers, timestamp).create()
 
 
+class SlackPlayerList(object):
+    def __init__(self):
+        self.players = r.get('https://yaiir.pythonanywhere.com/players').json()
+        self.flattened_players = self._slack_flatten_player_list()
+
+    def _slack_flatten_player_list(self):
+        out = []
+        for name, info in self.players.items():
+            out += [(name, info['record']['wins'], info['record']['losses'], info['elo']['current'])]
+
+        out.sort(key=lambda x: x[2])
+        out.sort(key=lambda x: x[1], reverse=True)
+        out.sort(key=lambda x: x[3], reverse=True)
+        return out
+
+    def filter_player_list(self, user_ids):
+        return [row for row in self.flattened_players if (row[0] in user_ids)]
+
+    def pprint(self, users=None):
+        playerlist = self.flattened_players
+        if users:
+            playerlist = self.filter_player_list(users)
+
+        out = '{}     | {} | {} | {} \n'.format('Elo', 'Wins', 'Losses', 'Player')
+        for name, wins, losses, elo in playerlist:
+            out += '{} | {}        | {}          | {}\n'.format(round(elo), wins, losses, name)
+        out = slack_replace_mentions_with_username(out)
+        out = {
+            "response_type": "in_channel",
+            "text": out
+        }
+        return out
+
+
 
 def slack_handle_results(text=None):
-    players = r.get('https://yaiir.pythonanywhere.com/players').json()
-    flattened = slack_flatten_records(players)
+    #players = r.get('https://yaiir.pythonanywhere.com/players').json()
+    #flattened = slack_flatten_records(players)
     if text:
         involved = extract_all_users_from_text(text)
-        flattened = [(name, wins, losses, elo) for (name, wins, losses, elo) in flattened if (name in involved)]
-    sorted_recs = slack_sort_flattened_records(flattened)
+        # flattened = [(name, wins, losses, elo) for (name, wins, losses, elo) in flattened if (name in involved)]
+    #sorted_recs = slack_sort_flattened_records(flattened)
     prepped_for_printing = slack_prep_records_for_printing(sorted_recs)
     return prepped_for_printing
 
@@ -312,7 +346,7 @@ def slack():
         out = slack_prep_games_for_printing()
         return jsonify(out)
     if command.com_type == 'playerlist':
-        out = slack_handle_results()
+        out = SlackPlayerList().pprint()
         return jsonify(out)
 
 
