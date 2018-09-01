@@ -170,29 +170,31 @@ def get_players():
 from re import findall, sub
 
 class SlackSingleGame(object):
-    def __init__(self, winners, losers, timestamp):
-        self.info = {
-            'winners': winners,
-            'losers': losers,
-            'timestamp': timestamp
+    def __init__(self, winners, losers, timestamp, game_id=None):
+        self.winners = winners
+        self.losers = losers
+        self.timestamp = timestamp
+        self.game_id = game_id
+
+    def _dictify(self):
+        out = {
+            'winners': self.winners,
+            'losers': self.losers,
+            'timestamp': self.timestamp,
+            'id': self.game_id
             }
+        return out
 
     def create(self):
-        r.post('https://yaiir.pythonanywhere.com/games', json=self.info)
+        r.post('https://yaiir.pythonanywhere.com/games', json=self._dictify())
         return self
 
+    def delete(self):
+        r.delete('https://yaiir.pythonanywhere.com/games/{}'.format(self.game_id))
+        return self
 
-def slack_handle_create(report):
-    timestamp = datetime.now().isoformat()
-
-    for _ in range(report['a']['wins']):
-        winners, losers = report['a']['members'], report['b']['members']
-        SlackSingleGame(winners, losers, timestamp).create()
-
-    for _ in range(report['b']['wins']):
-        winners, losers = report['b']['members'], report['a']['members']
-        SlackSingleGame(winners, losers, timestamp).create()
-
+    def pprint(self):
+        return self._dictify()
 
 class SlackPlayerList(object):
     def __init__(self):
@@ -230,31 +232,40 @@ class SlackPlayerList(object):
     def _replace_mentions_with_username(self, text):
         return sub('\<(.*?)\|', '', text).replace('>', '')
 
+class SlackGameList(object):
+    def __init__(self):
+        self.raw_games = r.get('https://yaiir.pythonanywhere.com/games').json()
+        self.games = [SlackSingleGame(game['winners'], game['losers'], game['timestamp'], game['id']) for game in self.raw_games]
 
-def slack_prep_games_for_printing(text='all the games'):
-    games = r.get('https://yaiir.pythonanywhere.com/games').json()
-    attachments = []
-    for game in games[::-1]:
-        attachments += [{
-                "title": '{} beat {} at {}'.format(game['winners'], game['losers'], game['timestamp']),
-                "callback_id": "delete_game",
-                "attachment_type": "default",
-                "actions": [
-                    {
-                        "name": "delete",
-                        "text": "Delete Game",
-                        "type": "button",
-                        "value": game['id']
-                    }
-                ]
-            }]
-    out =   {
-        "text": text,
+    def delete(self, game_id):
+        for game in self.games:
+
+            if str(game.game_id) == str(game_id):
+                game.delete()
+                return game.pprint()
+
+    def pprint(self, text='all the games'):
+        attachments = []
+        for game in self.games[::-1]:# reverse chron order, should probably make this explicit
+            attachments += [{
+                    "title": '{} beat {} at {}'.format(game.winners, game.losers, game.timestamp),
+                    "callback_id": "delete_game",
+                    "attachment_type": "default",
+                    "actions": [
+                        {
+                            "name": "delete",
+                            "text": "Delete Game",
+                            "type": "button",
+                            "value": game.game_id
+                        }
+                    ]
+                }]
+        out =   {
+        "text": 'all the games',
         "response_type": "in_channel",
         "attachments": attachments
         }
-    return out
-
+        return out
 
 class SlackCommand(object):
     def __init__(self, request):
@@ -264,7 +275,7 @@ class SlackCommand(object):
         self.com_type = self._calc_type()
         self.users = self._extract_all_users_from_text(self.cleaned_text)
         if self.com_type == 'report':
-            self.report = self._clean_input()
+            self.report = self._clean_report()
 
     def _calc_type(self):
         if '-' in self.cleaned_text:
@@ -274,7 +285,7 @@ class SlackCommand(object):
         else:
             return 'playerlist'
 
-    def _clean_input(self):
+    def _clean_report(self):
         a, b = self.cleaned_text.split('-')
         team_a, wins_a = a[:-1], int(a[-1])
         team_b, wins_b = b[1:], int(b[0])
@@ -289,18 +300,29 @@ class SlackCommand(object):
         list_with_tags = ['<{}>'.format(user) for user in list_of_users]
         return list_with_tags
 
+    def create(self):
+        report = self.report
+        timestamp = datetime.now().isoformat()
+
+        for _ in range(report['a']['wins']):
+            winners, losers = report['a']['members'], report['b']['members']
+            SlackSingleGame(winners, losers, timestamp).create()
+
+        for _ in range(report['b']['wins']):
+            winners, losers = report['b']['members'], report['a']['members']
+            SlackSingleGame(winners, losers, timestamp).create()
+        return self
+
 
 @app.route("/slack", methods=['POST'])
 def slack():
     command = SlackCommand(request)
     if command.com_type == 'report':
-        slack_handle_create(command.report)
-        ## TODO command.create()
+        command.create()
         out = SlackPlayerList().pprint(command.users)
         return jsonify(out)
     if command.com_type == 'gamelist':
-        ## TODO out = SlackGamesList()
-        out = slack_prep_games_for_printing()
+        out = SlackGameList().pprint()
         return jsonify(out)
     if command.com_type == 'playerlist':
         out = SlackPlayerList().pprint()
@@ -311,7 +333,5 @@ def slack():
 def slack_action():
     payload = loads(request.form['payload'])
     game_id = payload['actions'][0]['value']
-    r.delete('http://yaiir.pythonanywhere.com/games/' + game_id)
-    text = 'deleted game: {}'.format(game_id)
-    out = slack_prep_games_for_printing(text)
-    return jsonify(out)
+    deleted_metadata = SlackGameList().delete(game_id)
+    return jsonify({'deleted game':deleted_metadata})
