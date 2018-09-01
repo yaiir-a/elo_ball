@@ -169,28 +169,37 @@ def get_players():
 ##### SLACK INTEGRATION - should be separate but keeping together for python anywhere limitations
 from re import findall, sub
 
+class SlackSingleGame(object):
+    def __init__(self, winners, losers, timestamp):
+        self.info = {
+            'winners': winners,
+            'losers': losers,
+            'timestamp': timestamp
+            }
+
+    def create(self):
+        r.post('https://yaiir.pythonanywhere.com/games', json=self.info)
+        return self
+
+
+
 
 def extract_all_users_from_text(text):
     list_of_users = findall('\<(.*?)\>', text)
     list_with_tags = ['<{}>'.format(user) for user in list_of_users]
     return list_with_tags
 
-def slack_create_single(winners, losers, timestamp):
-    out = {
-            'winners': winners,
-            'losers': losers,
-            'timestamp': timestamp
-        }
-    r.post('https://yaiir.pythonanywhere.com/games', json=out)
 
 def slack_handle_create(report):
     timestamp = datetime.now().isoformat()
 
     for _ in range(report['a']['wins']):
-        slack_create_single(report['a']['members'], report['b']['members'], timestamp)
+        winners, losers = report['a']['members'], report['b']['members']
+        SlackSingleGame(winners, losers, timestamp).create()
 
     for _ in range(report['b']['wins']):
-        slack_create_single(report['b']['members'], report['a']['members'], timestamp)
+        winners, losers = report['b']['members'], report['a']['members']
+        SlackSingleGame(winners, losers, timestamp).create()
 
 
 
@@ -265,20 +274,47 @@ def slack_clean_input(text):
     }
     return out
 
+class SlackCommand(object):
+    def __init__(self, request):
+        self.request = request
+        self.raw_text = request.form['text']
+        self.cleaned_text = request.form['text'].replace(' ', '').replace('beat', '1-0')
+        self.com_type = self._calc_type()
+
+    def _calc_type(self):
+        if '-' in self.cleaned_text:
+            return 'report'
+        elif 'game' in self.cleaned_text:
+            return 'gamelist'
+        else:
+            return 'playerlist'
+
+    def slack_clean_input(self):
+        a, b = self.cleaned_text.split('-')
+        team_a, wins_a = a[:-1], int(a[-1])
+        team_b, wins_b = b[1:], int(b[0])
+        out = {
+            'a':{'members':extract_all_users_from_text(team_a), 'wins':wins_a},
+            'b':{'members':extract_all_users_from_text(team_b), 'wins':wins_b}
+        }
+        return out
+
 @app.route("/slack", methods=['POST'])
 def slack():
     text = request.form['text']
-    try:
+    command = SlackCommand(request)
+    if command.com_type == 'report':
         report = slack_clean_input(text)
         slack_handle_create(report)
         out = slack_handle_results(text)
         return jsonify(out)
-    except ValueError:
-        if 'game' in text:
-            out = slack_prep_games_for_printing()
-            return jsonify(out)
+    if command.com_type == 'gamelist':
+        out = slack_prep_games_for_printing()
+        return jsonify(out)
+    if command.com_type == 'playerlist':
         out = slack_handle_results()
         return jsonify(out)
+
 
 @app.route("/slack/actions", methods=['GET', 'POST'])
 def slack_action():
