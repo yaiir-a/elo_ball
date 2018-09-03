@@ -88,8 +88,8 @@ class PlayerList(object):
         for player in self.players:
             self.players[player]['elo'] = {'current':1500, 'history':[]}
         for winners, losers, timestamp in self.games_list:
-            winners_av =  sum([int(self.players[winner]['elo']['current']) for winner in winners])
-            losers_av =  sum([int(self.players[loser]['elo']['current']) for loser in losers])
+            winners_av =  sum([int(self.players[winner]['elo']['current']) for winner in winners])/len(winners)
+            losers_av =  sum([int(self.players[loser]['elo']['current']) for loser in losers])/len(losers)
             winner_gain = self._calc_winner_change(winners_av, losers_av)
 
             for winner in winners:
@@ -220,23 +220,25 @@ class SlackPlayerList(object):
 
     def pprint(self, users=None):
         playerlist = self.flattened_players
+        out = [['Elo', 'Wins', 'Losses', 'Player']]
         if users:
             playerlist = self.filter_player_list(users)
-
-        out = [['Elo', 'Diff', 'Wins', 'Losses', 'Player']]
+            out = [['Elo', 'Diff', 'Wins', 'Losses', 'Player']]
 
         for record in playerlist:
             name = self._replace_mentions_with_username(record['name'])
             elo, wins, losses = round(record['elo']['current']), record['record']['wins'], record['record']['losses']
-
-            last_game_ts = record['elo']['history'][-1][0]
-            history = record['elo']['history']
-            first_game_of_set = min([i for i, (ts, elo) in enumerate(history) if (ts == last_game_ts)])
-            prev_game_ts, prev_game_elo = record['elo']['history'][first_game_of_set - 1]
-            diff = elo - prev_game_elo
-            if prev_game_ts == last_game_ts:
-                diff = elo - 1500
-            out += [[elo, round(diff), wins, losses, name]]
+            if users:
+                last_game_ts = record['elo']['history'][-1][0]
+                history = record['elo']['history']
+                first_game_of_set = min([i for i, (ts, elo) in enumerate(history) if (ts == last_game_ts)])
+                prev_game_ts, prev_game_elo = record['elo']['history'][first_game_of_set - 1]
+                diff = elo - prev_game_elo
+                if prev_game_ts == last_game_ts:
+                    diff = elo - 1500
+                out += [[elo, round(diff), wins, losses, name]]
+            else:
+                out += [[elo, wins, losses, name]]
         tabulated = tabulate(out, tablefmt='simple', headers='firstrow')
         out = {
             "response_type": "in_channel",
