@@ -200,7 +200,6 @@ class SlackSingleGame(object):
 class SlackPlayerList(object):
     def __init__(self):
         self.players = r.get('https://yaiir.pythonanywhere.com/players').json()
-        self.flattened_players = self._slack_flatten_player_list()
 
     def _slack_flatten_player_list(self):
         out = []
@@ -209,43 +208,46 @@ class SlackPlayerList(object):
             flattened.update(v)
             out += [flattened]
 
-
         out.sort(key=lambda x: x['record']['losses'])
         out.sort(key=lambda x: x['record']['wins'], reverse=True)
         out.sort(key=lambda x: x['elo']['current'], reverse=True)
         return out
 
     def filter_player_list(self, user_ids):
-        return [row for row in self.flattened_players if (row['name'] in user_ids)]
+        return [row for row in self._slack_flatten_player_list() if (row['name'] in user_ids)]
 
-    def pprint(self, users=None):
-        playerlist = self.flattened_players
-        out = [['Elo', 'Wins', 'Losses', 'Player']]
-        if users:
-            playerlist = self.filter_player_list(users)
-            out = [['Elo', 'Diff', 'Wins', 'Losses', 'Player']]
+    def _prep_pprint(self, users=None):
+        out = [['Elo', 'Diff', 'Wins', 'Losses', 'Player']]
 
-        for record in playerlist:
+        for record in self._slack_flatten_player_list():
             name = self._replace_mentions_with_username(record['name'])
             elo, wins, losses = round(record['elo']['current']), record['record']['wins'], record['record']['losses']
-            if users:
-                last_game_ts = record['elo']['history'][-1][0]
-                history = record['elo']['history']
-                first_game_of_set = min([i for i, (ts, elo) in enumerate(history) if (ts == last_game_ts)])
-                prev_game_ts, prev_game_elo = record['elo']['history'][first_game_of_set - 1]
-                diff = elo - prev_game_elo
-                if prev_game_ts == last_game_ts:
-                    diff = elo - 1500
-                out += [[elo, round(diff), wins, losses, name]]
-            else:
-                out += [[elo, wins, losses, name]]
+            try:
+                if record['name'] in users:
+                    last_game_ts = record['elo']['history'][-1][0]
+                    history = record['elo']['history']
+                    first_game_of_set = min([i for i, (ts, elo) in enumerate(history) if (ts == last_game_ts)])
+                    prev_game_ts, prev_game_elo = record['elo']['history'][first_game_of_set - 1]
+                    diff = elo - prev_game_elo
+                    if prev_game_ts == last_game_ts:
+                        diff = elo - 1500
+                    diff = round(diff)
+                else:
+                    diff = 0
+            except TypeError:
+                diff = 0
+            out += [[elo, diff, wins, losses, name]]
+        return out
+
+    def pprint(self, users=None):
+        out = self._prep_pprint(users)
+
         tabulated = tabulate(out, tablefmt='simple', headers='firstrow')
         out = {
             "response_type": "in_channel",
             "text": '```{}```'.format(tabulated)
         }
         return out
-
 
     def _replace_mentions_with_username(self, text):
         return sub('\<(.*?)\|', '', text).replace('>', '')
