@@ -99,8 +99,16 @@ class PlayerList(object):
             for loser in losers:
                 self.players[loser]['elo']['current'] -= winner_gain
                 self.players[loser]['elo']['history'] += [(timestamp, self.players[loser]['elo']['current'] )]
-
         return self
+
+    def ready_for_returning(self):
+        out = []
+        players = self.players
+        for player in players:
+            info = players[player]
+            info['id'] = player
+            out += [info]
+        return out
 
 
 
@@ -162,17 +170,8 @@ def delete_games(game_id):
 @app.route('/players', methods=['GET'])
 def get_players():
     game_list = GameList()
-    player_list = PlayerList(game_list).add_records().add_elo()
-    # Dirty hack needs to be done throughout once implementation is complete. player_list should be the same as out throughout code
-    out = []
-    players = player_list.players
-    for player in players:
-        info = players[player]
-        info['id'] = player
-        out += [info]
-    # End dirty hack
-
-    return jsonify(out)
+    player_list = PlayerList(game_list).add_records().add_elo().ready_for_returning()
+    return jsonify(player_list)
 
 
 ##### SLACK INTEGRATION - should be separate but keeping together for python anywhere limitations
