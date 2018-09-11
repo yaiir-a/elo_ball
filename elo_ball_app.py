@@ -207,23 +207,19 @@ class SlackSingleGame(object):
 
 class SlackPlayerList(object):
     def __init__(self):
-        self.players = r.get('https://yaiir.pythonanywhere.com/players').json()
-
-    def _slack_flatten_player_list(self):
-        out = self.players
-
-        out.sort(key=lambda x: x['record']['losses'])
-        out.sort(key=lambda x: x['record']['wins'], reverse=True)
-        out.sort(key=lambda x: x['elo']['current'], reverse=True)
-        return out
+        raw = r.get('https://yaiir.pythonanywhere.com/players').json()
+        raw.sort(key=lambda x: x['record']['losses'])
+        raw.sort(key=lambda x: x['record']['wins'], reverse=True)
+        raw.sort(key=lambda x: x['elo']['current'], reverse=True)
+        self.players = raw
 
     def filter_player_list(self, user_ids):
-        return [row for row in self._slack_flatten_player_list() if (row['id'] in user_ids)]
+        return [row for row in self.players if (row['id'] in user_ids)]
 
     def _prep_pprint(self, users=None):
         out = [['Elo', 'Diff', 'Wins', 'Losses', 'Player']]
 
-        for record in self._slack_flatten_player_list():
+        for record in self.players:
             name = self._replace_mentions_with_username(record['id'])
             elo, wins, losses = round(record['elo']['current']), record['record']['wins'], record['record']['losses']
             try:
