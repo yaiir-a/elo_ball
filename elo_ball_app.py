@@ -99,8 +99,16 @@ class PlayerList(object):
             for loser in losers:
                 self.players[loser]['elo']['current'] -= winner_gain
                 self.players[loser]['elo']['history'] += [(timestamp, self.players[loser]['elo']['current'] )]
-
         return self
+
+    def ready_for_returning(self):
+        out = []
+        players = self.players
+        for player in players:
+            info = players[player]
+            info['id'] = player
+            out += [info]
+        return out
 
 
 
@@ -162,8 +170,8 @@ def delete_games(game_id):
 @app.route('/players', methods=['GET'])
 def get_players():
     game_list = GameList()
-    player_list = PlayerList(game_list).add_records().add_elo()
-    return jsonify(player_list.players)
+    player_list = PlayerList(game_list).add_records().add_elo().ready_for_returning()
+    return jsonify(player_list)
 
 
 ##### SLACK INTEGRATION - should be separate but keeping together for python anywhere limitations
@@ -199,31 +207,23 @@ class SlackSingleGame(object):
 
 class SlackPlayerList(object):
     def __init__(self):
-        self.players = r.get('https://yaiir.pythonanywhere.com/players').json()
-
-    def _slack_flatten_player_list(self):
-        out = []
-        for k, v in self.players.items():
-            flattened = {'name':k}
-            flattened.update(v)
-            out += [flattened]
-
-        out.sort(key=lambda x: x['record']['losses'])
-        out.sort(key=lambda x: x['record']['wins'], reverse=True)
-        out.sort(key=lambda x: x['elo']['current'], reverse=True)
-        return out
+        raw = r.get('https://yaiir.pythonanywhere.com/players').json()
+        raw.sort(key=lambda x: x['record']['losses'])
+        raw.sort(key=lambda x: x['record']['wins'], reverse=True)
+        raw.sort(key=lambda x: x['elo']['current'], reverse=True)
+        self.players = raw
 
     def filter_player_list(self, user_ids):
-        return [row for row in self._slack_flatten_player_list() if (row['name'] in user_ids)]
+        return [row for row in self.players if (row['id'] in user_ids)]
 
     def _prep_pprint(self, users=None):
         out = [['Elo', 'Diff', 'Wins', 'Losses', 'Player']]
 
-        for record in self._slack_flatten_player_list():
-            name = self._replace_mentions_with_username(record['name'])
+        for record in self.players:
+            name = self._replace_mentions_with_username(record['id'])
             elo, wins, losses = round(record['elo']['current']), record['record']['wins'], record['record']['losses']
             try:
-                if record['name'] in users:
+                if record['id'] in users:
                     last_game_ts = record['elo']['history'][-1][0]
                     history = record['elo']['history']
                     first_game_of_set = min([i for i, (ts, elo) in enumerate(history) if (ts == last_game_ts)])
