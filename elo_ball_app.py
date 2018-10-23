@@ -266,7 +266,7 @@ class SlackGameList(object):
 
     def pprint(self, text='all the games'):
         attachments = []
-        for game in self.games[::-1]:# reverse chron order, should probably make this explicit
+        for game in self.games[:100:-1]:# last 100 games for slack attachment limitation. reverse chron order, should probably make this explicit
             attachments += [{
                     "title": '{} beat {} at {}'.format(game.winners, game.losers, game.timestamp),
                     "callback_id": "delete_game",
