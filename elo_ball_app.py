@@ -217,7 +217,7 @@ class SlackPlayerList(object):
         return [row for row in self.players if (row['id'] in user_ids)]
 
     def _prep_pprint(self, users=None):
-        out = [['Elo', 'Diff', 'Wins', 'Losses', 'Player']]
+        out = [['Player', 'Elo', 'Diff', 'Wins', 'Losses']]
 
         for record in self.players:
             name = self._replace_mentions_with_username(record['id'])
@@ -236,7 +236,7 @@ class SlackPlayerList(object):
                     diff = 0
             except TypeError:
                 diff = 0
-            out += [[elo, diff, wins, losses, name]]
+            out += [[name, elo, diff, wins, losses]]
         return out
 
     def pprint(self, users=None):
