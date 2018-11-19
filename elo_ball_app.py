@@ -11,6 +11,8 @@ import requests as r
 app = Flask(__name__)
 
 
+
+
 db = MySQLDatabase(host='yaiir.mysql.pythonanywhere-services.com',
                      user="yaiir",
                      passwd=MYSQL_PASSWORD,
