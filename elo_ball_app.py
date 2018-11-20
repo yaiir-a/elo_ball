@@ -291,49 +291,8 @@ class SlackGameList(object):
         }
         return out
 
-class SlackHistory(object):
-    def __init__(self):
-        raw_data = r.get('https://yaiir.pythonanywhere.com/players').json()
-        df = pd.DataFrame(raw_data)
-
-        def munge_history(row):
-            hist = row['history']
-            hist_dict = {time: elo for time, elo in hist}
-            return hist_dict
-
-        df ['history'] = df['elo'].apply(munge_history)
-        df = df.set_index('id')
-        df = pd.DataFrame({name: df.loc[name]['history'] for name in df.index}).sort_index()
-        df = df.fillna(value=1500, limit=1)
-        df = df.fillna(method='ffill')
-        df.index = pd.to_datetime(df.index)
-        tg = pd.Grouper(freq='w')
-        df = df.groupby(tg).last().tail(6).sort_index(ascending=False)
-        df.index = df.index.strftime(date_format = '%Y-%m-%d')
-        df = df.transpose()
-        self.df = df.round(1)
-
-    def _prep_pprint(self):
-        df = self.df
-        df['Player'] = df.index
-        df['Player'] = df['Player'].apply(lambda x: self._replace_mentions_with_username(x))
-        df = df[['Player'] + df.columns.tolist()[:-1]]
-        headers = ['Player', 'Current'] + list(df.columns)[2:]
-        table = df.values.tolist()
-        return [headers] + table
-
-    def _replace_mentions_with_username(self, text):
-        return sub('\<(.*?)\|', '', text).replace('>', '')
-
-
-    def pprint(self):
-        out = self._prep_pprint()
-        tabulated = tabulate(out, tablefmt='simple', headers='firstrow')
-        out = {
-            "response_type": "in_channel",
-            "text": '```{}```'.format(tabulated)
-        }
-        return out
+from re import findall, sub
+from tabulate import tabulate
 
 class SlackCommand(object):
     def __init__(self, request):
