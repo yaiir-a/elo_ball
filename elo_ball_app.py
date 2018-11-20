@@ -245,7 +245,6 @@ class SlackPlayerList(object):
 
     def pprint(self, users=None):
         out = self._prep_pprint(users)
-
         tabulated = tabulate(out, tablefmt='simple', headers='firstrow')
         out = {
             "response_type": "in_channel",
@@ -291,7 +290,7 @@ class SlackGameList(object):
         }
         return out
 
-class SlackHistory(object):
+class SlackChanges(object):
     def __init__(self):
         raw_data = r.get('https://yaiir.pythonanywhere.com/players').json()
         df = pd.DataFrame(raw_data)
@@ -314,7 +313,7 @@ class SlackHistory(object):
 
     def _prep_pprint(self):
         df = self.df
-        df = df.tail(6).round(1).transpose()
+        df = df.diff(-1).head(6).round(1).transpose().sort_values(df.index[0], ascending=False)
         df['Player'] = df.index
         df['Player'] = df['Player'].apply(lambda x: self._replace_mentions_with_username(x))
         df = df[['Player'] + df.columns.tolist()[:-1]]
@@ -350,8 +349,8 @@ class SlackCommand(object):
             return 'report'
         elif 'game' in self.cleaned_text:
             return 'gamelist'
-        elif 'history' in self.cleaned_text:
-            return 'history'
+        elif 'changes' in self.cleaned_text:
+            return 'changes'
         else:
             return 'playerlist'
 
@@ -394,8 +393,8 @@ def slack():
     if command.com_type == 'gamelist':
         out = SlackGameList().pprint()
         return jsonify(out)
-    if command.com_type == 'history':
-        out = SlackHistory().pprint()
+    if command.com_type == 'changes':
+        out = SlackChanges().pprint()
         return jsonify(out)
     if command.com_type == 'playerlist':
         out = SlackPlayerList().pprint()
