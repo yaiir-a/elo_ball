@@ -314,6 +314,7 @@ class SlackChanges(object):
     def _prep_pprint(self):
         df = self.df
         df = df.diff(-1).head(6).round(1).transpose().sort_values(df.index[0], ascending=False)
+        df = df.head(3).append(df.tail(3))
         df['Player'] = df.index
         df['Player'] = df['Player'].apply(lambda x: self._replace_mentions_with_username(x))
         df = df[['Player'] + df.columns.tolist()[:-1]]
