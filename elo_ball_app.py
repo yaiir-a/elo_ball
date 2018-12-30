@@ -23,7 +23,7 @@ test_db_creds = {'host':'yaiir.mysql.pythonanywhere-services.com',
 
 
 
-db = MySQLDatabase(**test_db_creds)
+db = MySQLDatabase(**prod_db_creds)
 
 @app.before_request
 def _db_connect():
@@ -265,6 +265,8 @@ class SlackPlayerList(object):
 class SlackGameList(object):
     def __init__(self):
         self.raw_games = r.get('https://yaiir.pythonanywhere.com/games').json()
+        self.raw_games.sort(key=lambda x: x['timestamp'], reverse=True)
+        self.raw_games = self.raw_games[:30]
         self.games = [SlackSingleGame(game['winners'], game['losers'], game['timestamp'], game['id']) for game in self.raw_games]
 
     def delete(self, game_id):
@@ -276,7 +278,7 @@ class SlackGameList(object):
 
     def pprint(self, text='all the games'):
         attachments = []
-        for game in self.games[:30:-1]:# last 30 games for slack attachment limitation. reverse chron order, should probably make this explicit
+        for game in self.games:
             attachments += [{
                     "title": '{} beat {} at {}'.format(game.winners, game.losers, game.timestamp),
                     "callback_id": "delete_game",
