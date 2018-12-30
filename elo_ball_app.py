@@ -11,14 +11,19 @@ import requests as r
 app = Flask(__name__)
 
 
-def foo(x):
-    return x
+prod_db_creds = {'host':'yaiir.mysql.pythonanywhere-services.com',
+                'user':"yaiir",
+                'passwd':MYSQL_PASSWORD,
+                'database':"yaiir$gamerecords"}
+
+test_db_creds = {'host':'yaiir.mysql.pythonanywhere-services.com',
+                'user':"yaiir",
+                'passwd':MYSQL_PASSWORD,
+                'database':"yaiir$test-gamerecords"}
 
 
-db = MySQLDatabase(host='yaiir.mysql.pythonanywhere-services.com',
-                     user="yaiir",
-                     passwd=MYSQL_PASSWORD,
-                     database="yaiir$gamerecords")
+
+db = MySQLDatabase(**test_db_creds)
 
 @app.before_request
 def _db_connect():
