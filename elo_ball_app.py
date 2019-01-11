@@ -432,7 +432,7 @@ def slack():
     command = SlackCommand(request)
     if command.com_type == 'report':
         command.create()
-        out = SlackPlayerList().pprint(command.users)
+        out = SlackPlayerList(days=30).pprint(command.users)
         return jsonify(out)
     if command.com_type == 'gamelist':
         out = SlackGameList().pprint()
