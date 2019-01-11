@@ -231,7 +231,7 @@ class SlackSingleGame(object):
         return self._dictify()
 
 class SlackPlayerList(object):
-    def __init__(self):
+    def __init__(self, days=None):
         raw = r.get('https://yaiir.pythonanywhere.com/players').json()
         raw.sort(key=lambda x: x['record']['losses'])
         raw.sort(key=lambda x: x['record']['wins'], reverse=True)
@@ -376,6 +376,12 @@ class SlackCommand(object):
         elif 'changes' in self.cleaned_text:
             return 'changes'
         else:
+            try:
+                self.result_days = int(self.cleaned_text)
+            except ValueError:
+                self.result_days = 30  # Default days in Slack
+            if self.cleaned_text == '':
+                self.result_days = None
             return 'playerlist'
 
     def _clean_report(self):
@@ -421,7 +427,7 @@ def slack():
         out = SlackChanges().pprint()
         return jsonify(out)
     if command.com_type == 'playerlist':
-        out = SlackPlayerList().pprint()
+        out = SlackPlayerList(days=command.result_days).pprint()
         return jsonify(out)
 
 
