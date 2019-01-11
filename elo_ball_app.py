@@ -236,7 +236,10 @@ class SlackSingleGame(object):
 
 class SlackPlayerList(object):
     def __init__(self, days=None):
-        raw = r.get('https://yaiir.pythonanywhere.com/players').json()
+        query_url = 'https://yaiir.pythonanywhere.com/players'
+        if days:
+            query_url = 'https://yaiir.pythonanywhere.com/players?days={}'.format(days)
+        raw = r.get(query_url).json()
         raw.sort(key=lambda x: x['record']['losses'])
         raw.sort(key=lambda x: x['record']['wins'], reverse=True)
         raw.sort(key=lambda x: x['elo']['current'], reverse=True)
@@ -380,13 +383,20 @@ class SlackCommand(object):
         elif 'changes' in self.cleaned_text:
             return 'changes'
         else:
+            self._set_result_days()
+            return 'playerlist'
+
+    def _set_result_days(self):
+        if self.cleaned_text == '':
+            self.result_days = 30
+        elif self.cleaned_text == 'all':
+            self.result_days = None
+        else:
             try:
                 self.result_days = int(self.cleaned_text)
             except ValueError:
                 self.result_days = 30  # Default days in Slack
-            if self.cleaned_text == '':
-                self.result_days = None
-            return 'playerlist'
+
 
     def _clean_report(self):
         a, b = self.cleaned_text.split('-')
