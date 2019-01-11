@@ -160,6 +160,9 @@ class SingleGame(object):
         Games.create(**prepped_game)
         return self
 
+def get_days_from_req(request):
+    return request.args.get('days')
+
 
 @app.route('/')
 def hello_world():
@@ -178,7 +181,7 @@ def games():
         except:
             return make_response(jsonify({'error':'server fuckup'}), 500)
     else:
-        days = request.args.get('days')
+        days = get_days_from_req(request)
         return jsonify(GameList(days).games)
 
 
@@ -191,7 +194,8 @@ def delete_games(game_id):
 
 @app.route('/players', methods=['GET'])
 def get_players():
-    game_list = GameList()
+    days = get_days_from_req(request)
+    game_list = GameList(days)
     player_list = PlayerList(game_list).add_records().add_elo().ready_for_returning()
     return jsonify(player_list)
 
