@@ -4,12 +4,13 @@ from flask import Flask, jsonify, request, make_response
 from passwords import MYSQL_PASSWORD
 from peewee import MySQLDatabase, Model, CharField
 from json import loads, dumps
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import chain
 import requests as r
 
 app = Flask(__name__)
 
+### Database conenctions and things
 
 prod_db_creds = {'host':'yaiir.mysql.pythonanywhere-services.com',
                 'user':"yaiir",
@@ -24,6 +25,7 @@ test_db_creds = {'host':'yaiir.mysql.pythonanywhere-services.com',
 
 
 db = MySQLDatabase(**prod_db_creds)
+test_db = MySQLDatabase(**test_db_creds)
 
 @app.before_request
 def _db_connect():
@@ -43,15 +45,17 @@ class Games(BaseModel):
     account_id = CharField()
 
 
+### API stuff
+
 class GameError(Exception):
     pass
 
 
 class GameList(object):
-    def __init__(self):
-        self.games = self.get_all_games()
+    def __init__(self, days=None):
+        self.games = self.get_all_games(days)
 
-    def get_all_games(self):
+    def get_all_games(self, days):
         all_games = Games.select()
         out = []
         for row in all_games:
@@ -60,6 +64,15 @@ class GameList(object):
             out += [result]
 
         out.sort(key=lambda x: x['timestamp'])
+
+        if days:
+            date_ago = datetime.now().date() - timedelta(days=int(days))
+            date_ago_iso = date_ago.isoformat()
+            filtered = []
+            for game in out:
+                if game['timestamp'] > date_ago_iso:
+                    filtered += [game]
+            out = filtered
         return out
 
 
@@ -165,7 +178,8 @@ def games():
         except:
             return make_response(jsonify({'error':'server fuckup'}), 500)
     else:
-        return jsonify(GameList().games)
+        days = request.args.get('days')
+        return jsonify(GameList(days).games)
 
 
 @app.route('/games/<game_id>', methods=['DELETE'])
