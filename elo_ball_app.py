@@ -1,5 +1,3 @@
-# A very simple Flask Hello World app for you to get started with...
-
 from flask import Flask, jsonify, request, make_response
 from passwords import MYSQL_PASSWORD
 from peewee import MySQLDatabase, Model, CharField
