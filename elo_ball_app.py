@@ -276,7 +276,7 @@ class SlackPlayerList(object):
 
 class SlackGameList(object):
     def __init__(self):
-        self.raw_games = r.get('http://yaiir.com/games').json()
+        self.raw_games = r.get('http://www.yaiir.com/games').json()
         self.raw_games.sort(key=lambda x: x['timestamp'], reverse=True)
         self.raw_games = self.raw_games[:30]
         self.games = [SlackSingleGame(game['winners'], game['losers'], game['timestamp'], game['id']) for game in self.raw_games]
