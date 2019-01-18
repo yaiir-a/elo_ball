@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request, make_response
 from passwords import MYSQL_PASSWORD
+import config
 from peewee import MySQLDatabase, Model, CharField
 from json import loads, dumps
 from datetime import datetime, timedelta

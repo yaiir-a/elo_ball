@@ -2,3 +2,4 @@ passwords.py
 __pycache__/*
 blah.py.ipynb
 .ipynb_checkpoints/
+config.py
