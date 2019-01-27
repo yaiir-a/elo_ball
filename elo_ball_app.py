@@ -160,6 +160,7 @@ def hello_world():
     return 'Howdy from Flask staging'
 
 
+
 @app.route('/games', methods=['GET', 'POST'])
 def games():
     if request.method == 'POST':
@@ -215,11 +216,13 @@ class SlackSingleGame(object):
         return out
 
     def create(self):
+
         r.post(config.base_url + '/games', json=self._dictify())
         return self
 
     def delete(self):
         r.delete(config.base_url + '/games/{}'.format(self.game_id))
+
         return self
 
     def pprint(self):
@@ -230,6 +233,7 @@ class SlackPlayerList(object):
         query_url = config.base_url + '/players'
         if days:
             query_url = config.base_url + '/players?days={}'.format(days)
+
         raw = r.get(query_url).json()
         raw.sort(key=lambda x: x['record']['losses'])
         raw.sort(key=lambda x: x['record']['wins'], reverse=True)
@@ -277,6 +281,7 @@ class SlackPlayerList(object):
 class SlackGameList(object):
     def __init__(self):
         self.raw_games = r.get(config.base_url + '/games').json()
+
         self.raw_games.sort(key=lambda x: x['timestamp'], reverse=True)
         self.raw_games = self.raw_games[:30]
         self.games = [SlackSingleGame(game['winners'], game['losers'], game['timestamp'], game['id']) for game in self.raw_games]
@@ -314,6 +319,7 @@ class SlackGameList(object):
 class SlackChanges(object):
     def __init__(self):
         raw_data = r.get(config.base_url + '/players').json()
+
         df = pd.DataFrame(raw_data)
 
         def munge_history(row):
