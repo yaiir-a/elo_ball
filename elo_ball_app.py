@@ -148,7 +148,7 @@ class SingleGame(object):
 
     def create(self):
         prepped_game = self.prep_create_game()
-        Games.create(**prepped_game)
+        self.created_game = Games.create(**prepped_game)
         return self
 
 def get_days_from_req(request):

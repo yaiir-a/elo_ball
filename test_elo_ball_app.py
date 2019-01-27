@@ -1,9 +1,28 @@
 import elo_ball_app as e
-
-def test_foo():
-    assert e.foo(3) == 3
-    assert e.foo(4) == 3
+import config
+import requests as r
 
 
-def test_foo2():
-    assert e.foo(5) == 5
+def url(endpoint):
+    return config.base_url + endpoint
+
+
+def test_get_games():
+    print(r.get(url('/games')).status_code)
+
+def test_SingleGame():
+    payload = {
+        'losers':['testgame'],
+        'winners':['suckit']
+        }
+    game = e.SingleGame(payload).create()
+    new_game_id = game.created_game.id
+
+    out = r.delete(url('/games/{}'.format(new_game_id))).json()
+    print(out)
+
+
+
+
+test_SingleGame()
+
